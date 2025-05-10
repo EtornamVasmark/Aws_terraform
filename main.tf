@@ -7,13 +7,6 @@ terraform {
   }
 }
 
-# Add your variable declarations here
-
-variable "aws_availability_zone_a" {
-  description = "The availability zone for the public subnet 1"
-  type        = string
-}
-
 # Creating VPC
 resource "aws_vpc" "wordpress-vpc" {
   cidr_block = "10.0.0.0/24"
@@ -24,7 +17,7 @@ resource "aws_vpc" "wordpress-vpc" {
 resource "aws_subnet" "public_subnet_1" {
   vpc_id                  = aws_vpc.aws_capstone_vpc.id
   cidr_block              = "10.0.1.0/24"
-  availability_zone       = var.aws_availability_zone_a
+  availability_zone       = "us-east-1a" # Replace with your desired AZ
   map_public_ip_on_launch = true
   tags = {
     Name = "PublicSubnet1"
