@@ -97,3 +97,28 @@ resource "aws_security_group" "web_sg" {
   tags = { Name = "wordpress-web-sg" }
 }
 
+# -------------------------------------------
+# LAUNCH TEMPLATE
+# -------------------------------------------
+resource "aws_launch_template" "web_template" {
+  name_prefix   = "wordpress-launch-"
+  image_id      = "ami-0c2b8ca1dad447f8a" # Amazon Linux 2 AMI (HVM) in us-east-1
+  instance_type = var.instance_type
+  key_name      = var.key_name
+
+  vpc_security_group_ids = [aws_security_group.web_sg.id]
+
+  user_data = base64encode(<<-EOF
+              #!/bin/bash
+              yum update -y
+              yum install -y httpd
+              systemctl enable httpd
+              systemctl start httpd
+              echo "<h1>Hello from $(hostname -f)</h1>" > /var/www/html/index.html
+              EOF
+            )
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
