@@ -29,9 +29,3 @@ variable "key_name" {
 }
 
 
-# -------------------------------------------
-# PROVIDER CONFIGURATION
-# -------------------------------------------
-provider "aws" {
-  region = "us-east-1"
-}
