@@ -11,3 +11,27 @@ terraform {
 resource "aws_vpc" "wordpress-vpc" {
   cidr_block = "10.0.0.0/24"
 }
+
+# -------------------------------------------
+# VARIABLES (optional customization)
+# -------------------------------------------
+variable "region" {
+  default = "us-east-1"
+}
+
+variable "instance_type" {
+  default = "t2.micro"
+}
+
+variable "key_name" {
+  description = "Name of your existing EC2 key pair"
+  default     = "my-key-pair"
+}
+
+
+# -------------------------------------------
+# PROVIDER CONFIGURATION
+# -------------------------------------------
+provider "aws" {
+  region = "us-east-1"
+}
