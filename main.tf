@@ -16,7 +16,7 @@ terraform {
 # VARIABLES (optional customization)
 # -------------------------------------------
 variable "region" {
-  default = "us-east-1"
+  default = "eu-north-1"
 }
 
 variable "instance_type" {
