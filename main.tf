@@ -101,56 +101,89 @@ resource "aws_security_group" "web_sg" {
 # EC2 INSTANCE WITH WORDPRESS & LOCAL DATABASE
 # -------------------------------------------
 resource "aws_instance" "wordpress" {
-  ami                    = "ami-0c65adc9a5c1b5d7c"  # Amazon Linux 2 AMI for us-west-2
-  instance_type          = var.instance_type
-  subnet_id              = aws_subnet.public.id
-  key_name               = var.key_name
-  vpc_security_group_ids = [aws_security_group.web_sg.id]
+  ami           = "ami-0c55b159cbfafe1f0" # Amazon Linux 2 AMI for us-west-2
+  instance_type = var.instance_type
+  subnet_id     = aws_subnet.public.id
+  key_name      = var.key_name
+  security_groups = [aws_security_group.web_sg.name]
+
   associate_public_ip_address = true
 
   user_data = <<-EOF
-              #!/bin/bash
-              yum update -y
-              amazon-linux-extras enable php8.0
-              yum clean metadata
-              yum install -y php php-mysqlnd httpd mariadb-server wget unzip
+     #!/bin/bash
+    yum update -y
 
-              systemctl start httpd
-              systemctl enable httpd
+    # Enable 1GB swap memory
+    fallocate -l 1G /swapfile
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
 
-              systemctl start mariadb
-              systemctl enable mariadb
+    # Install Apache, PHP, MariaDB
+    yum install -y httpd php php-mysqlnd mariadb-server wget unzip
 
-              # Set up local database for WordPress
-              mysql -e "CREATE DATABASE wordpress;"
-              mysql -e "CREATE USER 'admin'@'localhost' IDENTIFIED BY 'password';"
-              mysql -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'admin'@'localhost';"
-              mysql -e "FLUSH PRIVILEGES;"
+    # Start services
+    systemctl start httpd
+    systemctl enable httpd
+    systemctl start mariadb
+    systemctl enable mariadb
 
-              # Install WordPress
-              cd /var/www/html
-              wget https://wordpress.org/latest.zip
-              unzip latest.zip
-              cp -r wordpress/* .
-              rm -rf wordpress latest.zip
+    # Configure Apache for performance
+    echo "KeepAlive On" >> /etc/httpd/conf/httpd.conf
+    echo "MaxKeepAliveRequests 100" >> /etc/httpd/conf/httpd.conf
+    echo "KeepAliveTimeout 5" >> /etc/httpd/conf/httpd.conf
+    echo 'AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css application/javascript' >> /etc/httpd/conf/httpd.conf
 
-              chown -R apache:apache /var/www/html
-              chmod -R 755 /var/www/html
+    # Configure MariaDB for performance
+    cat <<EOT >> /etc/my.cnf.d/server.cnf
+    [mysqld]
+    innodb_buffer_pool_size=256M
+    max_connections=50
+    query_cache_type=1
+    query_cache_size=64M
+    EOT
 
-              # Configure wp-config.php
-              cp wp-config-sample.php wp-config.php
-              sed -i "s/database_name_here/wordpress/" wp-config.php
-              sed -i "s/username_here/admin/" wp-config.php
-              sed -i "s/password_here/password/" wp-config.php
-              sed -i "s/localhost/127.0.0.1/" wp-config.php
+    systemctl restart mariadb
 
-              systemctl restart httpd
-              EOF
+    # Setup MySQL DB for WordPress
+    mysql -e "CREATE DATABASE wordpress;"
+    mysql -e "CREATE USER 'wpuser'@'localhost' IDENTIFIED BY 'password';"
+    mysql -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'localhost';"
+    mysql -e "FLUSH PRIVILEGES;"
+
+    # Download and install WordPress
+    cd /var/www/html
+    wget https://wordpress.org/latest.zip
+    unzip latest.zip
+    cp -r wordpress/* .
+    rm -rf wordpress latest.zip
+    cp wp-config-sample.php wp-config.php
+
+    # Configure wp-config
+    sed -i "s/database_name_here/wordpress/" wp-config.php
+    sed -i "s/username_here/wpuser/" wp-config.php
+    sed -i "s/password_here/password/" wp-config.php
+    echo "define('DISABLE_WP_CRON', true);" >> wp-config.php
+
+    # Set permissions
+    chown -R apache:apache /var/www/html
+    chmod -R 755 /var/www/html
+
+    # Install LiteSpeed Cache plugin
+    mkdir -p wp-content/plugins
+    wget https://downloads.wordpress.org/plugin/litespeed-cache.latest-stable.zip
+    unzip litespeed-cache.latest-stable.zip -d wp-content/plugins
+    rm litespeed-cache.latest-stable.zip
+
+    systemctl restart httpd
+  EOF
 
   tags = {
-    Name = "wordpress-ec2"
+    Name = "wordpress-instance"
   }
 }
+
 
 
 
