@@ -166,3 +166,17 @@ data "aws_ami" "amazon_linux" {
     values = ["hvm"]
   }
 }
+
+# -------------------------------------------
+# OUTPUT VALUES
+# -------------------------------------------
+output "wordpress_public_ip" {
+  description = "Public IP address of the WordPress instance"
+  value       = aws_instance.wordpress_instance.public_ip
+}
+
+output "wordpress_url" {
+  description = "URL to access the WordPress site"
+  value       = "http://${aws_instance.wordpress_instance.public_ip}"
+}
+
