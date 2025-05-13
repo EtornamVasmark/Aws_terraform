@@ -100,53 +100,50 @@ resource "aws_security_group" "web_sg" {
 # -------------------------------------------
 # EC2 INSTANCE FOR WORDPRESS
 # -------------------------------------------
-resource "aws_instance" "wordpress_instance" {
-  ami                         = data.aws_ami.amazon_linux.id
-  instance_type               = var.instance_type
-  subnet_id                   = aws_subnet.public.id
-  vpc_security_group_ids      = [aws_security_group.web_sg.id]
-  key_name                    = var.key_name
+resource "aws_instance" "wordpress" {
+  ami           = "ami-0914547665e6a707c" # Amazon Linux 2 AMI in eu-north-1
+  instance_type = var.instance_type
+  subnet_id     = aws_subnet.public.id
+  key_name      = var.key_name
+  security_groups = [aws_security_group.web_sg.name]
+
   associate_public_ip_address = true
 
   user_data = <<-EOF
               #!/bin/bash
-              # Update packages
-              sudo yum update -y
+              yum update -y
+              amazon-linux-extras enable php8.0
+              yum clean metadata
+              yum install -y php php-mysqlnd httpd mariadb wget unzip
 
-              # Enable PHP 8.0
-              sudo amazon-linux-extras enable php8.0
-              sudo yum clean metadata
-              sudo yum install -y php php-mysqlnd httpd mariadb-server wget unzip
+              systemctl start httpd
+              systemctl enable httpd
 
-              # Start and enable Apache
-              sudo systemctl start httpd
-              sudo systemctl enable httpd
-
-              # Download and extract WordPress
               cd /var/www/html
-              sudo wget https://wordpress.org/latest.tar.gz
-              sudo tar -xzf latest.tar.gz
-              sudo cp -r wordpress/* .
-              sudo rm -rf wordpress latest.tar.gz
+              wget https://wordpress.org/latest.zip
+              unzip latest.zip
+              cp -r wordpress/* .
+              rm -rf wordpress latest.zip
 
-              # Set permissions
-              sudo chown -R apache:apache /var/www/html
-              sudo chmod -R 755 /var/www/html
+              chown -R apache:apache /var/www/html
+              chmod -R 755 /var/www/html
 
-              # Create a basic wp-config file
+              # Create wp-config with placeholder DB creds
               cp wp-config-sample.php wp-config.php
-              sed -i 's/database_name_here/wordpress/' wp-config.php
-              sed -i 's/username_here/root/' wp-config.php
-              sed -i 's/password_here/password/' wp-config.php
+              sed -i "s/database_name_here/wordpress/" wp-config.php
+              sed -i "s/username_here/admin/" wp-config.php
+              sed -i "s/password_here/password/" wp-config.php
+              sed -i "s/localhost/127.0.0.1/" wp-config.php
 
-              # Restart Apache
-              sudo systemctl restart httpd
+              # Allow HTTP through firewall (if firewalld exists)
+              systemctl restart httpd
               EOF
 
   tags = {
-    Name = "wordpress-ec2"
+    Name = "wordpress-server"
   }
 }
+
 
 
 # -------------------------------------------
