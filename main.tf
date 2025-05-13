@@ -101,11 +101,11 @@ resource "aws_security_group" "web_sg" {
 # EC2 INSTANCE FOR WORDPRESS
 # -------------------------------------------
 resource "aws_instance" "wordpress" {
-  ami           = "ami-0914547665e6a707c" # Amazon Linux 2 AMI in eu-north-1
-  instance_type = var.instance_type
-  subnet_id     = aws_subnet.public.id
-  key_name      = var.key_name
-  security_groups = [aws_security_group.web_sg.name]
+  ami                    = data.aws_ami.amazon_linux.id # Use the data source for latest Amazon Linux 2 AMI
+  instance_type          = var.instance_type
+  subnet_id              = aws_subnet.public.id
+  key_name               = var.key_name
+  vpc_security_group_ids = [aws_security_group.web_sg.id]
 
   associate_public_ip_address = true
 
@@ -169,11 +169,12 @@ data "aws_ami" "amazon_linux" {
 # -------------------------------------------
 output "wordpress_public_ip" {
   description = "Public IP address of the WordPress instance"
-  value       = aws_instance.wordpress_instance.public_ip
+  value       = aws_instance.wordpress.public_ip
 }
 
 output "wordpress_url" {
   description = "URL to access the WordPress site"
-  value       = "http://${aws_instance.wordpress_instance.public_ip}"
+  value       = "http://${aws_instance.wordpress.public_ip}"
 }
+
 
