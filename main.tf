@@ -97,32 +97,28 @@ resource "aws_security_group" "web_sg" {
   tags = { Name = "wordpress-web-sg" }
 }
 
-# EC2 Instance (Amazon Linux)
+# -------------------------------------------
+# EC2 INSTANCE FOR WORDPRESS
+# -------------------------------------------
 resource "aws_instance" "wordpress_instance" {
-  ami                         = "ami-0cbd40f694b804622" # ✅ Amazon Linux 2023 AMI for eu-north-1
-  instance_type               = "t3.micro"
-  subnet_id                   = aws_subnet.public_subnet.id
-  vpc_security_group_ids      = [aws_security_group.wordpress_sg.id]
+  ami                         = data.aws_ami.amazon_linux.id
+  instance_type               = var.instance_type
+  subnet_id                   = aws_subnet.public.id
+  vpc_security_group_ids      = [aws_security_group.web_sg.id]
+  key_name                    = var.key_name
   associate_public_ip_address = true
-  key_name                    = "your-keypair-name" # ✅ Replace with your EC2 key pair name
 
   user_data = <<-EOF
               #!/bin/bash
-              yum update -y
-              amazon-linux-extras enable php8.2
-              yum clean metadata
-              yum install -y httpd php php-mysqlnd php-fpm mariadb
-              systemctl enable httpd
-              systemctl start httpd
-              cd /var/www/html
-              wget https://wordpress.org/latest.tar.gz
-              tar -xzf latest.tar.gz
-              cp -r wordpress/* .
-              chown -R apache:apache /var/www/html
-              chmod -R 755 /var/www/html
+              sudo yum update -y
+              sudo amazon-linux-extras enable php8.0
+              sudo yum install -y php php-mysqlnd httpd mariadb-server
+              sudo systemctl start httpd
+              sudo systemctl enable httpd
+              echo "<?php phpinfo(); ?>" > /var/www/html/index.php
               EOF
 
   tags = {
-    Name = "wordpress-instance"
+    Name = "wordpress-ec2"
   }
 }
