@@ -110,18 +110,44 @@ resource "aws_instance" "wordpress_instance" {
 
   user_data = <<-EOF
               #!/bin/bash
+              # Update packages
               sudo yum update -y
+
+              # Enable PHP 8.0
               sudo amazon-linux-extras enable php8.0
-              sudo yum install -y php php-mysqlnd httpd mariadb-server
+              sudo yum clean metadata
+              sudo yum install -y php php-mysqlnd httpd mariadb-server wget unzip
+
+              # Start and enable Apache
               sudo systemctl start httpd
               sudo systemctl enable httpd
-              echo "<?php phpinfo(); ?>" > /var/www/html/index.php
+
+              # Download and extract WordPress
+              cd /var/www/html
+              sudo wget https://wordpress.org/latest.tar.gz
+              sudo tar -xzf latest.tar.gz
+              sudo cp -r wordpress/* .
+              sudo rm -rf wordpress latest.tar.gz
+
+              # Set permissions
+              sudo chown -R apache:apache /var/www/html
+              sudo chmod -R 755 /var/www/html
+
+              # Create a basic wp-config file
+              cp wp-config-sample.php wp-config.php
+              sed -i 's/database_name_here/wordpress/' wp-config.php
+              sed -i 's/username_here/root/' wp-config.php
+              sed -i 's/password_here/password/' wp-config.php
+
+              # Restart Apache
+              sudo systemctl restart httpd
               EOF
 
   tags = {
     Name = "wordpress-ec2"
   }
 }
+
 
 # -------------------------------------------
 # GET LATEST AMAZON LINUX 2 AMI
