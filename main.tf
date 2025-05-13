@@ -66,14 +66,15 @@ resource "aws_route_table_association" "a" {
 }
 
 # -------------------------------------------
-# SECURITY GROUP
+# SECURITY GROUP FOR WORDPRESS INSTANCE
 # -------------------------------------------
 resource "aws_security_group" "web_sg" {
   name        = "wordpress-sg"
-  description = "Allow HTTP and SSH"
+  description = "Allow HTTP and SSH access"
   vpc_id      = aws_vpc.main.id
 
   ingress {
+    description = "HTTP"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
@@ -81,6 +82,15 @@ resource "aws_security_group" "web_sg" {
   }
 
   ingress {
+    description = "HTTPS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "SSH"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
@@ -94,18 +104,21 @@ resource "aws_security_group" "web_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "wordpress-web-sg" }
+  tags = {
+    Name = "wordpress-web-sg"
+  }
 }
 
 # -------------------------------------------
 # EC2 INSTANCE WITH WORDPRESS & LOCAL DATABASE
 # -------------------------------------------
 resource "aws_instance" "wordpress" {
-  ami                    = "ami-0c65adc9a5c1b5d7c"  # Amazon Linux 2 AMI for us-west-2
+  ami                    = data.aws_ami.amazon_linux.id
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public.id
-  key_name               = var.key_name
   vpc_security_group_ids = [aws_security_group.web_sg.id]
+  key_name               = var.key_name
+
   associate_public_ip_address = true
 
   user_data = <<-EOF
@@ -114,41 +127,42 @@ resource "aws_instance" "wordpress" {
               amazon-linux-extras enable php8.0
               yum clean metadata
               yum install -y php php-mysqlnd httpd mariadb-server wget unzip
-
+              
               systemctl start httpd
               systemctl enable httpd
-
               systemctl start mariadb
               systemctl enable mariadb
-
-              # Set up local database for WordPress
+              
+              # Set root password and secure MySQL
               mysql -e "CREATE DATABASE wordpress;"
-              mysql -e "CREATE USER 'admin'@'localhost' IDENTIFIED BY 'password';"
-              mysql -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'admin'@'localhost';"
+              mysql -e "CREATE USER 'wpuser'@'localhost' IDENTIFIED BY 'password';"
+              mysql -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'wpuser'@'localhost';"
               mysql -e "FLUSH PRIVILEGES;"
 
               # Install WordPress
               cd /var/www/html
-              wget https://wordpress.org/latest.zip
-              unzip latest.zip
+              wget https://wordpress.org/latest.tar.gz
+              tar -xzf latest.tar.gz
               cp -r wordpress/* .
-              rm -rf wordpress latest.zip
+              rm -rf wordpress latest.tar.gz
 
-              chown -R apache:apache /var/www/html
-              chmod -R 755 /var/www/html
-
-              # Configure wp-config.php
               cp wp-config-sample.php wp-config.php
               sed -i "s/database_name_here/wordpress/" wp-config.php
-              sed -i "s/username_here/admin/" wp-config.php
+              sed -i "s/username_here/wpuser/" wp-config.php
               sed -i "s/password_here/password/" wp-config.php
-              sed -i "s/localhost/127.0.0.1/" wp-config.php
 
+              chown -R apache:apache /var/www/html/*
+              chmod -R 755 /var/www/html/
+              
               systemctl restart httpd
+              systemctl restart mariadb
+
+              # Create PHP info page for debugging
+              echo "<?php phpinfo(); ?>" > /var/www/html/info.php
               EOF
 
   tags = {
-    Name = "wordpress-ec2"
+    Name = "wordpress-server"
   }
 }
 
