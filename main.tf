@@ -98,68 +98,57 @@ resource "aws_security_group" "web_sg" {
 }
 
 # -------------------------------------------
-# EC2 INSTANCE FOR WORDPRESS
+# EC2 INSTANCE WITH WORDPRESS & LOCAL DATABASE
 # -------------------------------------------
 resource "aws_instance" "wordpress" {
-  ami                    = data.aws_ami.amazon_linux.id # Use the data source for latest Amazon Linux 2 AMI
+  ami                    = "ami-0c65adc9a5c1b5d7c"  # Amazon Linux 2 AMI for us-west-2
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public.id
   key_name               = var.key_name
   vpc_security_group_ids = [aws_security_group.web_sg.id]
-
   associate_public_ip_address = true
 
   user_data = <<-EOF
               #!/bin/bash
-              # Update system packages
               yum update -y
               amazon-linux-extras enable php8.0
               yum clean metadata
-              yum install -y php php-mysqlnd httpd mariadb-server mariadb wget unzip
+              yum install -y php php-mysqlnd httpd mariadb-server wget unzip
 
-              # Start and enable Apache web server
               systemctl start httpd
               systemctl enable httpd
 
-              # Start and enable MariaDB database server
               systemctl start mariadb
               systemctl enable mariadb
 
-              # Create WordPress database and user
+              # Set up local database for WordPress
               mysql -e "CREATE DATABASE wordpress;"
               mysql -e "CREATE USER 'admin'@'localhost' IDENTIFIED BY 'password';"
               mysql -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'admin'@'localhost';"
               mysql -e "FLUSH PRIVILEGES;"
 
-              # Download and set up WordPress
+              # Install WordPress
               cd /var/www/html
               wget https://wordpress.org/latest.zip
               unzip latest.zip
               cp -r wordpress/* .
               rm -rf wordpress latest.zip
 
-              # Set proper permissions
               chown -R apache:apache /var/www/html
               chmod -R 755 /var/www/html
 
-              # Create wp-config with database credentials
+              # Configure wp-config.php
               cp wp-config-sample.php wp-config.php
               sed -i "s/database_name_here/wordpress/" wp-config.php
               sed -i "s/username_here/admin/" wp-config.php
               sed -i "s/password_here/password/" wp-config.php
-              sed -i "s/localhost/localhost/" wp-config.php
+              sed -i "s/localhost/127.0.0.1/" wp-config.php
 
-              # Generate WordPress salts for security
-              SALTS=$(curl -s https://api.wordpress.org/secret-key/1.1/salt/)
-              sed -i "/define( 'AUTH_KEY'/,/define( 'NONCE_SALT'/d" wp-config.php
-              printf '%s\n' "$SALTS" >> wp-config.php
-
-              # Restart Apache
               systemctl restart httpd
               EOF
 
   tags = {
-    Name = "wordpress-server"
+    Name = "wordpress-ec2"
   }
 }
 
